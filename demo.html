@@ -1,0 +1,147 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+<title>Filter</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="stylesheet" type="text/css" href="css/common.css">
+</head>
+<body>
+<div id="wrap">
+    <div id="preview"><canvas id="canvas"></canvas></div>  
+    <div id="nav"><ul id="scroller"></ul></div>
+</div>
+</body>
+<script src="js/jquery.js"></script>
+<script src="js/iscroll.js"></script>
+<script src="js/spin.min.js"></script>
+<script src="js/jsmanipulate.js"> </script>
+<script>
+(function() {
+
+    // singleton
+    function getSpinner() {
+        if (!getSpinner._sp) {
+            var opts = {
+                lines: 13,
+                length: 7,
+                width: 4,
+                radius: 10,
+                corners: 1,
+                rotate: 0,
+                color: '#ccc',
+                speed: 1,
+                trail: 60,
+                shadow: !1,
+                hwaccel: !1
+            };
+            getSpinner._sp= new Spinner(opts);
+        }
+        return getSpinner._sp;
+    }
+
+    function getCanvasPixelData(canvas) {
+        return canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height)
+    }
+
+    function copyCanvas(src, x, y, width, m) {
+        var canvas = document.createElement("canvas"), ctx
+        if (undefined === m) {
+            canvas.width = src.width;
+            canvas.height = src.height;
+            ctx = canvas.getContext("2d");
+            ctx.drawImage(src, 0, 0);
+        } else {
+            canvas.width = width;
+            canvas.height = m;
+            ctx = canvas.getContext("2d");
+            ctx.drawImage(src, -x, -y);
+        }
+        return canvas;
+    }
+
+    // Apply the specified filter to the receiver ImageData object.
+    function applyEffects(imageData, filtername) {
+        var impl = JSManipulate[filtername], converter;
+        if (impl && typeof impl.filter === 'function') {
+            try {
+                impl.filter(imageData, {});
+            } catch (e) {
+                console.log(e.message);
+            }
+        }
+    }
+
+    function buildEffectsItems() {
+        var scroller = $('#scroller'), previewNode = $('#preview').get(0);
+        var activeEl, locker = false, length = 0;
+
+        // init effects list
+        for (var filtername in JSManipulate) {
+            if (JSManipulate.hasOwnProperty(filtername)) {
+                scroller.append('<li action-data="' + filtername + '" action-type="filter">' + $.camelCase(filtername) + '</li>');
+                ++length;
+            }
+        }
+
+        // init effects nav scroller
+        scroller.width(79 * length).fadeIn();
+        new iScroll('nav', {
+            snap: true,
+            momentum: false,
+            hScrollbar: false
+        });
+
+        $('#nav').delegate('[action-type=filter]', 'click', function() {
+            if (locker) return;
+            locker = true;
+
+            if (activeEl) {
+                $(activeEl).removeClass('active');
+            }
+            activeEl = this;
+
+            $(this).addClass('active');
+            getSpinner().spin(previewNode);
+
+            var type = $(this).attr('action-data');
+            setTimeout(function() {
+                var imageData = getCanvasPixelData(copyCanvas(duplicateCavans));
+                var ctx = canvas.getContext('2d');
+                applyEffects(imageData, type);
+                ctx.putImageData(imageData, 0, 0);
+                setTimeout(function() {
+                    locker = false;
+                    getSpinner().stop();
+                }, 500);
+            }, 1);
+
+            return false;
+        });
+    }
+
+    function init() {
+        // init effects navigation
+        buildEffectsItems();
+
+        var img = new Image(), ctx;
+        canvas = $('#canvas').get(0);
+        ctx = canvas.getContext('2d');
+        img.onload = function() {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            duplicateCavans = copyCanvas(canvas);
+        };
+        img.src = 'images/' + (~~(Math.random() * 10 % 3)) + '.jpg';
+    }
+
+    var canvas, duplicateCavans;
+
+    init();
+
+})();
+</script>
+</html>
